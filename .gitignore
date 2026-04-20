@@ -1,0 +1,20 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+.env
+scratch/
+
+# Replit & Local Agent State
+.config/
+.local/
+.agents/
+.replit
+replit.nix
+*.log
+.temp/
+
+# Binaries
+bin/

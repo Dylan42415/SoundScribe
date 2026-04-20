@@ -1,0 +1,157 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Lexend:wght@300;400;500;600;700&family=Open+Dyslexic&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 152 57% 50%;
+    --secondary-foreground: 210 40% 98%;
+    --accent: 32 95% 60%;
+    --accent-foreground: 222 47% 11%;
+    --muted: 215 25% 95%;
+    --muted-foreground: 215 16% 47%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 216 20% 90%;
+    --input: 216 20% 90%;
+    --ring: 221 83% 53%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --radius: 0.75rem;
+    --font-sans: 'DM Sans', sans-serif;
+    --font-heading: 'Lexend', sans-serif;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 5%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 2%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 18%;
+    --input: 217 33% 18%;
+    --ring: 224 76% 48%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased transition-colors duration-300;
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    @apply tracking-tight;
+  }
+}
+
+html.dark {
+  background-color: #000;
+}
+
+/* High Contrast Mode */
+body.high-contrast {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --primary: 221 100% 40%;
+  --secondary: 152 100% 30%;
+  --accent: 32 100% 40%;
+  --muted: 0 0% 92%;
+  --muted-foreground: 0 0% 20%;
+  --border: 0 0% 0%;
+  --card: 0 0% 100%;
+}
+
+/* Dyslexia Friendly Font Mode */
+body.dyslexia-font {
+  --font-sans: 'OpenDyslexic', 'Comic Sans MS', sans-serif !important;
+  --font-heading: 'OpenDyslexic', 'Comic Sans MS', sans-serif !important;
+}
+
+/* Custom Utilities */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg;
+  }
+
+  .interactive-card {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border border-transparent hover:border-primary/20;
+  }
+
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+}
+
+/* Mind Map Tree Visualization */
+.mind-map-node {
+  @apply relative p-4 rounded-xl bg-card border shadow-sm transition-all hover:shadow-md hover:border-primary/50 cursor-default;
+}
+
+.mind-map-connector {
+  @apply absolute w-px bg-border;
+}
+
+/* Word-level audio highlight - applied directly via DOM (no React re-render) */
+.word-active {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  border-radius: 3px;
+}
+
+/* Knowledge Graph edge draw-on animation */
+@keyframes kgEdgeReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Knowledge Graph root node pulse */
+@keyframes kgRootPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 6px rgba(245,158,11,0.25), 0 0 0 12px rgba(245,158,11,0.10), 0 6px 24px rgba(0,0,0,0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(245,158,11,0.35), 0 0 0 20px rgba(245,158,11,0.12), 0 6px 24px rgba(0,0,0,0.18);
+  }
+}
