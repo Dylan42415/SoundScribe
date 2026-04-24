@@ -20,8 +20,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist", "public"),
     emptyOutDir: true,
-    minify: false,
-    target: "es2020",
+    minify: "terser",
+    target: "es2015",
   },
   define: {
     "global": "window",
