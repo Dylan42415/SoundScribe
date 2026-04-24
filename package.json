@@ -50,6 +50,7 @@
     "@uppy/core": "^5.2.0",
     "@uppy/dashboard": "^5.1.1",
     "@uppy/react": "^5.2.0",
+    "bufferutil": "^4.0.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -96,8 +97,7 @@
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod": "^3.25.76",
-    "zod-validation-error": "^3.5.4",
-    "bufferutil": "^4.0.8"
+    "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.15",
@@ -117,6 +117,7 @@
     "drizzle-kit": "^0.31.8",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
+    "terser": "^5.46.2",
     "vite": "^7.3.2"
   },
   "overrides": {

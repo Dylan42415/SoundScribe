@@ -21,7 +21,15 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist", "public"),
     emptyOutDir: true,
     target: "es2020",
-    minify: false, // Disable temporarily to find the syntax error
+    minify: "terser", 
+    terserOptions: {
+      compress: {
+        passes: 2,
+      },
+      format: {
+        comments: false,
+      },
+    },
   },
   optimizeDeps: {
     exclude: ["@shared"],
