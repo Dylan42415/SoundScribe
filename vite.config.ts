@@ -20,8 +20,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist", "public"),
     emptyOutDir: true,
-    target: "es2020",
-    minify: true,
+    target: "esnext",
+    minify: false,
   },
   server: {
     fs: {
