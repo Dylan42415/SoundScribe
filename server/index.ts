@@ -7,7 +7,6 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
 
 const app = express();
 const httpServer = createServer(app);
@@ -92,29 +91,26 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
     
-    // Robust SPA fallback directly in index.ts
-    app.get("*", (req, res) => {
-      // 1. Never serve index.html for API routes
-      if (req.path.startsWith("/api/")) return res.sendStatus(404);
-      
-      // 2. Never serve index.html for files that look like assets but are missing
-      // (This prevents the "Unexpected token <" syntax error)
-      if (req.path.match(/\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico|json)$/i)) {
-        return res.status(404).send("Asset not found");
+    // Robust SPA fallback as middleware to catch anything serveStatic missed
+    app.use((req, res, next) => {
+      if (req.path.startsWith("/api/") || req.method !== "GET") {
+        return next();
       }
-
+      
+      // Never serve index.html for files that look like assets but are missing
+      if (req.path.match(/\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico|json)$/i)) {
+        return next(); // Let it 404 naturally
+      }
+      
       const distPath = path.resolve(process.cwd(), "dist", "public");
       const indexPath = path.join(distPath, "index.html");
       
       if (fs.existsSync(indexPath)) {
-        // 3. Ensure index.html is NEVER cached so it always points to the latest asset hashes
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
+        res.setHeader("Content-Type", "text/html");
         res.sendFile(indexPath);
       } else {
-        log(`SPA fallback failed: index.html not found at ${indexPath}`, "static");
-        res.status(404).send("Application not found");
+        next();
       }
     });
   }
