@@ -21,7 +21,8 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist", "public"),
     emptyOutDir: true,
     assetsDir: "static-v1",
-    minify: true,
+    minify: false,
+    sourcemap: true,
   },
   server: {
     fs: {
