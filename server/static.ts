@@ -81,7 +81,15 @@ export function serveStatic(app: Express) {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
-    res.sendFile(indexPath);
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        console.error(`[static] Error serving index.html:`, err);
+        // Do not pass to next() to avoid Express default handler or hanging
+        if (!res.headersSent) {
+          res.status(500).send("Error serving application");
+        }
+      }
+    });
   });
 }
 
