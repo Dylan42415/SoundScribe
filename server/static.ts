@@ -77,6 +77,10 @@ export function serveStatic(app: Express) {
       return res.status(404).json({ message: "Not found" });
     }
 
+    // Never cache index.html — it contains hashed asset references that change per build
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.sendFile(indexPath);
   });
 }
