@@ -3,18 +3,32 @@ import type { User } from "@shared/models/auth";
 import { supabase } from "../lib/supabase";
 
 async function fetchUser(): Promise<User | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return null;
-  const u = session.user;
-  return {
-    id: u.id,
-    email: u.email!,
-    firstName: u.user_metadata?.full_name?.split(" ")[0] || "User",
-    lastName: u.user_metadata?.full_name?.split(" ")[1] || "",
-    profileImageUrl: u.user_metadata?.avatar_url,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
+  // Add a 5-second timeout for the initial session check
+  const timeoutPromise = new Promise<null>((_, reject) => 
+    setTimeout(() => reject(new Error("Auth session timeout")), 5000)
+  );
+
+  try {
+    const { data: { session } } = await Promise.race([
+      supabase.auth.getSession(),
+      timeoutPromise
+    ]) as any;
+
+    if (!session) return null;
+    const u = session.user;
+    return {
+      id: u.id,
+      email: u.email!,
+      firstName: u.user_metadata?.full_name?.split(" ")[0] || "User",
+      lastName: u.user_metadata?.full_name?.split(" ")[1] || "",
+      profileImageUrl: u.user_metadata?.avatar_url,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  } catch (error) {
+    console.error("[auth] fetchUser error or timeout:", error);
+    return null; // Fail gracefully to unauthenticated state
+  }
 }
 
 async function logout(): Promise<void> {

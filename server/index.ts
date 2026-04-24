@@ -93,23 +93,34 @@ app.use((req, res, next) => {
     
     // Robust SPA fallback as middleware to catch anything serveStatic missed
     app.use((req, res, next) => {
+      // Never handle API routes or non-GET requests here
       if (req.path.startsWith("/api/") || req.method !== "GET") {
         return next();
       }
       
-      // Never serve index.html for files that look like assets but are missing
-      if (req.path.match(/\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico|json)$/i)) {
-        return next(); // Let it 404 naturally
+      // Explicitly block common asset types from falling back to index.html
+      // This prevents the "Unexpected token <" error
+      const isAsset = req.path.match(/\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico|json|map)$/i);
+      if (isAsset) {
+        log(`Asset not found: ${req.path}`, "static");
+        return res.status(404).send("Asset not found");
       }
       
       const distPath = path.resolve(process.cwd(), "dist", "public");
       const indexPath = path.join(distPath, "index.html");
       
       if (fs.existsSync(indexPath)) {
-        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        // EXTREME CACHE CONTROL: Force fresh index.html every time
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        res.setHeader("Surrogate-Control", "no-store");
+        
+        // Ensure correct MIME type
         res.setHeader("Content-Type", "text/html");
         res.sendFile(indexPath);
       } else {
+        log(`SPA fallback failed: index.html missing at ${indexPath}`, "static");
         next();
       }
     });
