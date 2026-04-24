@@ -3,44 +3,43 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(process.cwd(), "dist", "public");
-  const indexPath = path.resolve(distPath, "index.html");
+  const possiblePaths = [
+    path.resolve(process.cwd(), "dist", "public"),
+    path.resolve(process.cwd(), "public"),
+    path.resolve(__dirname, "..", "dist", "public"),
+    path.resolve(__dirname, "public")
+  ];
 
-  console.log(`[static] Resolving build directory at: ${distPath}`);
-  if (!fs.existsSync(distPath)) {
-    console.error(`[static] ERROR: Build directory not found! Checked: ${distPath}`);
-    const distParent = path.resolve(process.cwd(), "dist");
-    if (fs.existsSync(distParent)) {
-       console.log(`[static] Contents of 'dist':`, fs.readdirSync(distParent));
+  let distPath = "";
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p) && fs.existsSync(path.resolve(p, "index.html"))) {
+      distPath = p;
+      break;
     }
+  }
+
+  if (!distPath) {
+    console.error("[static] CRITICAL ERROR: Build directory not found!");
+    console.log("[static] Checked paths:", possiblePaths);
     return;
   }
 
-  // Debug: List files
-  console.log(`[static] Contents of 'public':`, fs.readdirSync(distPath));
-  const assetsPath = path.resolve(distPath, "assets");
-  if (fs.existsSync(assetsPath)) {
-    console.log(`[static] Contents of 'assets':`, fs.readdirSync(assetsPath).slice(0, 10)); // Limit to 10
-  }
+  console.log(`[static] Serving assets from: ${distPath}`);
+  const indexPath = path.resolve(distPath, "index.html");
 
   app.use(express.static(distPath));
 
-  // Fallback to index.html for SPA routing
   app.get("*", (req, res) => {
-    // Only return 404 for missing files in the /assets folder
     if (req.path.startsWith("/assets/")) {
-      console.log(`[static] Asset not found: ${req.path}`);
-      res.status(404).end();
+      res.status(404).send("Asset not found");
       return;
     }
 
-    // Don't serve index.html for API calls
     if (req.path.startsWith("/api")) {
       res.status(404).json({ message: "API route not found" });
       return;
     }
 
-    console.log(`[static] Serving index.html for SPA route: ${req.path}`);
     res.sendFile(indexPath);
   });
 }
