@@ -9,12 +9,18 @@ export function serveStatic(app: Express) {
   console.log(`[static] Resolving build directory at: ${distPath}`);
   if (!fs.existsSync(distPath)) {
     console.error(`[static] ERROR: Build directory not found! Checked: ${distPath}`);
-    // List what IS in the dist folder to help debug
     const distParent = path.resolve(process.cwd(), "dist");
     if (fs.existsSync(distParent)) {
        console.log(`[static] Contents of 'dist':`, fs.readdirSync(distParent));
     }
     return;
+  }
+
+  // Debug: List files
+  console.log(`[static] Contents of 'public':`, fs.readdirSync(distPath));
+  const assetsPath = path.resolve(distPath, "assets");
+  if (fs.existsSync(assetsPath)) {
+    console.log(`[static] Contents of 'assets':`, fs.readdirSync(assetsPath).slice(0, 10)); // Limit to 10
   }
 
   app.use(express.static(distPath));
