@@ -6,40 +6,35 @@ export function serveStatic(app: Express) {
   const distPath = path.resolve(process.cwd(), "dist", "public");
   const indexPath = path.resolve(distPath, "index.html");
 
+  console.log(`[static] Resolving build directory at: ${distPath}`);
   if (!fs.existsSync(distPath)) {
-    console.error(`[static] ERROR: Build directory not found at ${distPath}`);
+    console.error(`[static] ERROR: Build directory not found! Checked: ${distPath}`);
+    // List what IS in the dist folder to help debug
+    const distParent = path.resolve(process.cwd(), "dist");
+    if (fs.existsSync(distParent)) {
+       console.log(`[static] Contents of 'dist':`, fs.readdirSync(distParent));
+    }
     return;
   }
-
-  // Serve static assets with a logger
-  app.use((req, res, next) => {
-    if (req.path.startsWith("/assets/")) {
-       console.log(`[static] Requesting asset: ${req.path}`);
-    }
-    next();
-  });
 
   app.use(express.static(distPath));
 
   // Fallback to index.html for SPA routing
   app.get("*", (req, res) => {
-    if (res.headersSent) return;
-
-    // Don't serve index.html for missing assets or API calls
-    if (req.path.startsWith("/api") || req.path.includes(".")) {
-      console.log(`[static] 404 for file/api: ${req.path}`);
+    // Only return 404 for missing files in the /assets folder
+    if (req.path.startsWith("/assets/")) {
+      console.log(`[static] Asset not found: ${req.path}`);
       res.status(404).end();
       return;
     }
 
-    console.log(`[static] Serving index.html for path: ${req.path}`);
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        console.error(`[static] Error sending index.html:`, err);
-        if (!res.headersSent) {
-          res.status(500).send("Error loading application");
-        }
-      }
-    });
+    // Don't serve index.html for API calls
+    if (req.path.startsWith("/api")) {
+      res.status(404).json({ message: "API route not found" });
+      return;
+    }
+
+    console.log(`[static] Serving index.html for SPA route: ${req.path}`);
+    res.sendFile(indexPath);
   });
 }
