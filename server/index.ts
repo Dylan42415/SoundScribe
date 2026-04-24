@@ -37,8 +37,9 @@ app.use(cookieParser());
 
 // --- Security Layers ---
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP temporarily to debug white screen
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
 }));
 
 export function log(message: string, source = "express") {
