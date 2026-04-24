@@ -68,11 +68,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await registerRoutes(httpServer, app);
+
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   }
-
-  await registerRoutes(httpServer, app);
 
   if (process.env.NODE_ENV !== "production") {
     const { setupVite } = await import("./vite");
