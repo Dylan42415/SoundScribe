@@ -89,24 +89,19 @@ app.use((req, res, next) => {
   log(`Running in ${process.env.NODE_ENV || "development"} mode`);
 
   if (process.env.NODE_ENV === "production") {
-    // 1. MANUAL ASSET SERVING OVERRIDE
-    // This is the most robust way to ensure assets are served from the correct absolute path
-    app.use("/assets", (req, res, next) => {
+    // 1. MANUAL ASSET SERVING OVERRIDE (Cache Busted)
+    app.use("/static-v1", (req, res, next) => {
       const distPath = path.resolve(process.cwd(), "dist", "public");
-      const assetPath = path.join(distPath, "assets", req.path);
+      const assetPath = path.join(distPath, "static-v1", req.path);
       
       if (fs.existsSync(assetPath)) {
-        // Set correct MIME types manually
         if (req.path.endsWith(".js")) res.setHeader("Content-Type", "application/javascript");
         if (req.path.endsWith(".css")) res.setHeader("Content-Type", "text/css");
         
-        // Cache hashed assets for 1 year
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        res.setHeader("X-Served-By", "manual-asset-handler");
+        res.setHeader("X-Served-By", "manual-asset-handler-v1");
         return res.sendFile(assetPath);
       }
-      
-      log(`Manual asset check failed for: ${assetPath}`, "static");
       next();
     });
 
