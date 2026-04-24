@@ -21,6 +21,11 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist", "public"),
     emptyOutDir: true,
     minify: false,
+    target: "es2020",
+  },
+  define: {
+    "global": "window",
+    "process.env": "{}",
   },
   server: {
     fs: {

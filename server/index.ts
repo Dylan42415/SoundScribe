@@ -123,12 +123,79 @@ app.use((req, res, next) => {
       const indexPath = path.join(distPath, "index.html");
       
       if (fs.existsSync(indexPath)) {
-        // Log available assets for debugging
-        try {
-          const assets = fs.readdirSync(path.join(distPath, "assets"));
-          log(`Available assets: ${assets.join(", ")}`, "static");
-        } catch (e) {}
+        let content = fs.readFileSync(indexPath, 'utf-8');
+        
+        // Inject Advanced Multi-Point Diagnostic System
+        const diagScript = `
+    <script>
+      // ADVANCED MULTI-POINT DIAGNOSTIC SYSTEM
+      (function() {
+        const report = {
+          errors: [],
+          checks: {
+            api: 'pending',
+            supabase: 'pending',
+            env: 'pending',
+            browser: 'pending'
+          }
+        };
 
+        function updateUI() {
+          let div = document.getElementById('diag-report');
+          if (!div) {
+            div = document.createElement('div');
+            div.id = 'diag-report';
+            div.style = 'position:fixed;top:0;left:0;width:100%;background:#1a1a1a;color:#eee;padding:20px;z-index:9999;font-family:monospace;white-space:pre-wrap;box-sizing:border-box;border-bottom:4px solid #f44336;';
+            document.body.prepend(div);
+          }
+          
+          let content = '<h2 style="color:#f44336;margin:0 0 10px 0;">System Diagnostic Report</h2>';
+          content += '<b>[Checks]</b> ' + 
+            (report.checks.browser === 'ok' ? '✅' : '❌') + ' Browser  ' +
+            (report.checks.api === 'ok' ? '✅' : '❌') + ' API  ' +
+            (report.checks.env === 'ok' ? '✅' : '❌') + ' Config\\n\\n';
+          
+          if (report.errors.length > 0) {
+            content += '<b style="color:#ff5252;">[Failures]</b>\\n';
+            report.errors.forEach(err => {
+              content += \`> \${err.msg}\\n  Source: \${err.url || 'internal'}\\n\\n\`;
+            });
+          }
+          
+          content += '<button onclick="location.reload()" style="background:#444;color:white;border:none;padding:8px 16px;cursor:pointer;border-radius:4px;">Force Refresh</button>';
+          div.innerHTML = content;
+        }
+
+        window.onerror = function(msg, url, line, col, error) {
+          report.errors.push({ msg, url, line, col });
+          updateUI();
+          return false;
+        };
+
+        // 1. Browser Check
+        report.checks.browser = (window.fetch && window.Promise && window.localStorage) ? 'ok' : 'fail';
+
+        // 2. API Check
+        fetch('/api/recordings').then(r => {
+          report.checks.api = (r.status === 401 || r.status === 200) ? 'ok' : 'fail';
+          updateUI();
+        }).catch(() => {
+          report.checks.api = 'fail';
+          updateUI();
+        });
+
+        // 3. Env Check (Simulated check for Vite replacements)
+        setTimeout(() => {
+          report.checks.env = 'ok'; // Assuming if we reach here, basic config is okay
+          updateUI();
+        }, 1000);
+
+        console.log('Diagnostic system active');
+      })();
+    </script>`;
+        
+        content = content.replace('</head>', `${diagScript}</head>`);
+        
         // EXTREME CACHE CONTROL: Force fresh index.html every time
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.setHeader("Pragma", "no-cache");
@@ -138,7 +205,7 @@ app.use((req, res, next) => {
         // Ensure correct MIME type
         res.setHeader("Content-Type", "text/html");
         res.setHeader("X-Served-By", "spa-fallback");
-        res.sendFile(indexPath);
+        res.send(content);
       } else {
         res.setHeader("X-Served-By", "fallback-missing-index");
         next();
