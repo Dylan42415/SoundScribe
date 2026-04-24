@@ -94,12 +94,23 @@ app.use((req, res, next) => {
     
     // Robust SPA fallback directly in index.ts
     app.get("*", (req, res) => {
+      // 1. Never serve index.html for API routes
       if (req.path.startsWith("/api/")) return res.sendStatus(404);
       
+      // 2. Never serve index.html for files that look like assets but are missing
+      // (This prevents the "Unexpected token <" syntax error)
+      if (req.path.match(/\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico|json)$/i)) {
+        return res.status(404).send("Asset not found");
+      }
+
       const distPath = path.resolve(process.cwd(), "dist", "public");
       const indexPath = path.join(distPath, "index.html");
       
       if (fs.existsSync(indexPath)) {
+        // 3. Ensure index.html is NEVER cached so it always points to the latest asset hashes
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
         res.sendFile(indexPath);
       } else {
         log(`SPA fallback failed: index.html not found at ${indexPath}`, "static");
