@@ -37,14 +37,8 @@ app.use(cookieParser());
 
 // --- Security Layers ---
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-      "img-src": ["'self'", "data:", "https:", "http:"],
-      "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      "connect-src": ["'self'", "https:", "http:", "ws:", "wss:"],
-    },
-  },
+  contentSecurityPolicy: false, // Disable CSP temporarily to debug white screen
+  crossOriginEmbedderPolicy: false,
 }));
 
 export function log(message: string, source = "express") {
@@ -61,36 +55,11 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
 
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        // Sanitize sensitive data from logs
-        const sanitized = JSON.parse(JSON.stringify(capturedJsonResponse));
-        const sensitiveKeys = ["password", "token", "auth_token", "secret", "apiKey"];
-        const mask = (obj: any) => {
-          for (const key in obj) {
-            if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk))) {
-              obj[key] = "[MASKED]";
-            } else if (typeof obj[key] === "object") {
-              mask(obj[key]);
-            }
-          }
-        };
-        mask(sanitized);
-        logLine += ` :: ${JSON.stringify(sanitized)}`;
-      }
-
-      log(logLine);
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
     }
   });
 
@@ -99,14 +68,6 @@ app.use((req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
@@ -118,10 +79,14 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Final Error Handler (MUST BE LAST)
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    if (res.headersSent) return;
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    res.status(status).json({ message });
+  });
+
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
