@@ -23,10 +23,6 @@ export default defineConfig({
     minify: "terser",
     target: "es2015",
   },
-  define: {
-    "global": "window",
-    "process.env": "{}",
-  },
   server: {
     fs: {
       strict: true,

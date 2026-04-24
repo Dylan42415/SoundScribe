@@ -38,7 +38,7 @@
           if (report.errors.length > 0) {
             content += '<b style="color:#ff5252;">[Failures]</b>\n';
             report.errors.forEach(err => {
-              content += `> ${err.msg}\n  Source: ${err.url || 'internal'}\n\n`;
+              content += `> ${err.msg}\n  Location: Line ${err.line}, Col ${err.col}\n  Source: ${err.url || 'internal'}\n\n`;
             });
           }
           
