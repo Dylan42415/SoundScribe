@@ -3,45 +3,64 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  // Use __dirname so this works correctly in the compiled bundle (dist/index.cjs)
-  // In the bundle, __dirname = dist/, so "public" = dist/public/
-  const distPath = path.resolve(__dirname, "public");
+  const distPath = findDistPublic();
 
-  if (!fs.existsSync(distPath)) {
-    // Fallback: try cwd-based path (dev or alternative layouts)
-    const cwdPath = path.resolve(process.cwd(), "dist", "public");
-    if (fs.existsSync(cwdPath)) {
-      return serveFromPath(app, cwdPath);
-    }
-    throw new Error(
-      `Could not find the build directory at ${distPath} or ${cwdPath}. Make sure to build the client first.`,
-    );
+  if (!distPath) {
+    console.error("[static] FATAL: Could not find dist/public directory!");
+    console.error("[static] __dirname =", __dirname);
+    console.error("[static] cwd =", process.cwd());
+
+    // Add a debug endpoint so we can diagnose on Railway
+    app.get("*", (_req, res) => {
+      res.status(500).json({
+        error: "Build directory not found",
+        __dirname,
+        cwd: process.cwd(),
+        triedPaths: getCandidatePaths().map((p) => ({
+          path: p,
+          exists: fs.existsSync(p),
+        })),
+      });
+    });
+    return;
   }
 
-  serveFromPath(app, distPath);
-}
-
-function serveFromPath(app: Express, distPath: string) {
-  const indexPath = path.resolve(distPath, "index.html");
+  const indexPath = path.join(distPath, "index.html");
 
   console.log(`[static] Serving from: ${distPath}`);
   console.log(`[static] index.html exists: ${fs.existsSync(indexPath)}`);
 
-  // Log the assets directory contents for debugging on first deploy
-  const assetsDir = path.resolve(distPath, "assets");
+  // Log the assets directory contents for debugging
+  const assetsDir = path.join(distPath, "assets");
   if (fs.existsSync(assetsDir)) {
     const files = fs.readdirSync(assetsDir);
     console.log(`[static] Assets (${files.length}): ${files.join(", ")}`);
   } else {
-    console.warn(`[static] WARNING: assets directory not found at ${assetsDir}`);
+    console.warn(
+      `[static] WARNING: assets directory not found at ${assetsDir}`,
+    );
   }
+
+  // Debug endpoint (remove after confirmed working)
+  app.get("/debug-static", (_req, res) => {
+    const assets = fs.existsSync(assetsDir)
+      ? fs.readdirSync(assetsDir)
+      : [];
+    res.json({
+      distPath,
+      indexExists: fs.existsSync(indexPath),
+      assets,
+      __dirname,
+      cwd: process.cwd(),
+    });
+  });
 
   // Serve static files with proper cache headers for hashed assets
   app.use(
     express.static(distPath, {
-      maxAge: "1y", // Hashed filenames are safe to cache aggressively
+      maxAge: "1y",
       immutable: true,
-      index: false, // Don't auto-serve index.html for directory requests
+      index: false,
     }),
   );
 
@@ -60,4 +79,28 @@ function serveFromPath(app: Express, distPath: string) {
 
     res.sendFile(indexPath);
   });
+}
+
+function getCandidatePaths(): string[] {
+  return [
+    // 1. __dirname/public — works when index.cjs is in dist/
+    path.resolve(__dirname, "public"),
+    // 2. cwd/dist/public — works when cwd is project root
+    path.resolve(process.cwd(), "dist", "public"),
+    // 3. __dirname/../dist/public — works when __dirname is project root or server/
+    path.resolve(__dirname, "..", "dist", "public"),
+    // 4. cwd/public — works if cwd IS the dist folder
+    path.resolve(process.cwd(), "public"),
+  ];
+}
+
+function findDistPublic(): string | null {
+  for (const candidate of getCandidatePaths()) {
+    const indexHtml = path.join(candidate, "index.html");
+    if (fs.existsSync(indexHtml)) {
+      console.log(`[static] Found dist/public at: ${candidate}`);
+      return candidate;
+    }
+  }
+  return null;
 }
