@@ -5,20 +5,12 @@
  */
 
 interface EnvConfig {
-  neo4j: {
-    uri: string;
-    username: string;
-    database: string;
-  };
   groq: {
     apiKey: boolean; // only flag existence, never expose value
   };
 }
 
 const REQUIRED_SECRETS: Record<string, string> = {
-  NEO4J_URI: "Neo4j connection URI (e.g. neo4j+s://xxxx.databases.neo4j.io)",
-  NEO4J_USERNAME: "Neo4j username",
-  NEO4J_PASSWORD: "Neo4j password",
   GROQ_API_KEY: "Groq API key for AI inference",
 };
 
@@ -34,7 +26,7 @@ export function validateEnv(): EnvConfig {
   if (missing.length > 0) {
     console.error("\n❌ Missing required environment variables:\n");
     missing.forEach((m) => console.error(m));
-    console.error("\nPlease set these in Replit Secrets and restart.\n");
+    console.error("\nPlease set these in environment variables and restart.\n");
     // Do not throw in dev — allow partial functionality
     if (process.env.NODE_ENV === "production") {
       throw new Error("Missing required environment variables. Cannot start in production.");
@@ -42,11 +34,6 @@ export function validateEnv(): EnvConfig {
   }
 
   return {
-    neo4j: {
-      uri: process.env.NEO4J_URI ?? "",
-      username: process.env.NEO4J_USERNAME ?? "",
-      database: process.env.NEO4J_DATABASE ?? "neo4j",
-    },
     groq: {
       apiKey: !!process.env.GROQ_API_KEY,
     },
