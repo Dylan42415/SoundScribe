@@ -55,14 +55,61 @@ export function serveStatic(app: Express) {
     });
   });
 
-  // Serve static files with proper cache headers for hashed assets
-  app.use(
-    express.static(distPath, {
-      maxAge: "1y",
-      immutable: true,
-      index: false,
-    }),
-  );
+  // Robust manual static file server to bypass any express.static / esbuild mangling issues
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    
+    // Don't intercept API routes
+    if (req.path.startsWith("/api")) return next();
+    
+    // Don't intercept root, let the catch-all handle index.html
+    if (req.path === "/") return next();
+
+    try {
+      const decodedPath = decodeURIComponent(req.path);
+      // Remove leading slash to join correctly with distPath
+      const relativePath = decodedPath.startsWith('/') ? decodedPath.slice(1) : decodedPath;
+      const filePath = path.join(distPath, relativePath);
+
+      if (!fs.existsSync(filePath)) {
+        return next();
+      }
+
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        return next();
+      }
+
+      // Add long cache for hashed assets in /assets/
+      if (req.path.startsWith("/assets/")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+
+      // Set MIME types manually to avoid any "Refused to apply style" errors
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        ".css": "text/css; charset=utf-8",
+        ".js": "application/javascript; charset=utf-8",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".ico": "image/x-icon",
+        ".json": "application/json",
+      };
+
+      if (mimeTypes[ext]) {
+        res.setHeader("Content-Type", mimeTypes[ext]);
+      }
+
+      // Stream the file
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+    } catch (err) {
+      console.error(`[static] Error serving static file ${req.path}:`, err);
+      next();
+    }
+  });
 
   // Catch-all: serve index.html ONLY for navigation requests (not assets/api)
   app.get("*", (req, res) => {
