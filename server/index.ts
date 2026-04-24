@@ -89,21 +89,34 @@ app.use((req, res, next) => {
   log(`Running in ${process.env.NODE_ENV || "development"} mode`);
 
   if (process.env.NODE_ENV === "production") {
+    // 1. MANUAL ASSET SERVING OVERRIDE
+    // This is the most robust way to ensure assets are served from the correct absolute path
+    app.use("/assets", (req, res, next) => {
+      const distPath = path.resolve(process.cwd(), "dist", "public");
+      const assetPath = path.join(distPath, "assets", req.path);
+      
+      if (fs.existsSync(assetPath)) {
+        // Set correct MIME types manually
+        if (req.path.endsWith(".js")) res.setHeader("Content-Type", "application/javascript");
+        if (req.path.endsWith(".css")) res.setHeader("Content-Type", "text/css");
+        
+        // Cache hashed assets for 1 year
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.setHeader("X-Served-By", "manual-asset-handler");
+        return res.sendFile(assetPath);
+      }
+      
+      log(`Manual asset check failed for: ${assetPath}`, "static");
+      next();
+    });
+
     serveStatic(app);
     
-    // Robust SPA fallback as middleware to catch anything serveStatic missed
+    // 2. Robust SPA fallback as middleware to catch anything serveStatic missed
     app.use((req, res, next) => {
       // Never handle API routes or non-GET requests here
       if (req.path.startsWith("/api/") || req.method !== "GET") {
         return next();
-      }
-      
-      // Explicitly block common asset types from falling back to index.html
-      // This prevents the "Unexpected token <" error
-      const isAsset = req.path.match(/\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ico|json|map)$/i);
-      if (isAsset) {
-        log(`Asset not found: ${req.path}`, "static");
-        return res.status(404).send("Asset not found");
       }
       
       const distPath = path.resolve(process.cwd(), "dist", "public");
@@ -114,9 +127,7 @@ app.use((req, res, next) => {
         try {
           const assets = fs.readdirSync(path.join(distPath, "assets"));
           log(`Available assets: ${assets.join(", ")}`, "static");
-        } catch (e) {
-          log(`Could not list assets: ${e}`, "static");
-        }
+        } catch (e) {}
 
         // EXTREME CACHE CONTROL: Force fresh index.html every time
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -129,7 +140,6 @@ app.use((req, res, next) => {
         res.setHeader("X-Served-By", "spa-fallback");
         res.sendFile(indexPath);
       } else {
-        log(`SPA fallback failed: index.html missing at ${indexPath}`, "static");
         res.setHeader("X-Served-By", "fallback-missing-index");
         next();
       }
