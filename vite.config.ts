@@ -21,7 +21,7 @@ export default defineConfig({
   },
   define: {
     "process.env": {},
-    "global": "window", // Some libraries expect 'global' to exist
+    "global": "globalThis", 
   },
   optimizeDeps: {
     exclude: ["@shared"], // Don't try to pre-bundle the shared folder
