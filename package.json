@@ -96,7 +96,8 @@
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod": "^3.25.76",
-    "zod-validation-error": "^3.5.4"
+    "zod-validation-error": "^3.5.4",
+    "bufferutil": "^4.0.8"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.15",
@@ -129,7 +130,5 @@
     "picomatch": "^4.0.4",
     "rollup": "^4.59.0"
   },
-  "optionalDependencies": {
-    "bufferutil": "^4.0.8"
   }
 }
