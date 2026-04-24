@@ -37,7 +37,19 @@ app.use(cookieParser());
 
 // --- Security Layers ---
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.supabase.co"],
+      "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      "font-src": ["'self'", "https://fonts.gstatic.com"],
+      "img-src": ["'self'", "data:", "https://*.supabase.co", "https://images.unsplash.com"],
+      "connect-src": ["'self'", "https://*.supabase.co", "https://*.openai.com", "https://*.railway.app"],
+      "frame-src": ["'self'"],
+      "media-src": ["'self'", "data:", "https://*.supabase.co"],
+    },
+  },
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: false,
 }));
@@ -69,6 +81,8 @@ app.use((req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+
+  log(`Running in ${process.env.NODE_ENV || "development"} mode`);
 
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);

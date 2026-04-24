@@ -28,7 +28,12 @@ export function serveStatic(app: Express) {
   }
 
   const indexPath = path.join(distPath, "index.html");
-  console.log(`[static] Serving production assets from: ${distPath}`);
+  if (!fs.existsSync(indexPath)) {
+    console.error(`[static] FATAL: index.html not found at ${indexPath}`);
+  } else {
+    console.log(`[static] Serving production assets from: ${distPath}`);
+    console.log(`[static] Verified index.html at: ${indexPath}`);
+  }
 
   // 1. Serve static files with optimized caching
   app.use(express.static(distPath, {

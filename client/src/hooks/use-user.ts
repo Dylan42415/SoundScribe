@@ -13,9 +13,10 @@ function parseResponse<T>(schema: z.ZodSchema<T>, data: unknown): T {
   return result.data;
 }
 
-export function useUserStats() {
+export function useUserStats(enabled: boolean = true) {
   return useQuery({
     queryKey: [api.user.getStats.path],
+    enabled,
     queryFn: async () => {
       const res = await fetch(api.user.getStats.path, { credentials: "include" });
       if (!res.ok) {

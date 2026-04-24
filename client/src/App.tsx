@@ -20,9 +20,9 @@ function ProtectedRoutes() {
   const { user, isLoading } = useAuth();
   
   // Apply persistent settings on app load
-  const { data: stats } = useUserStats();
+  const { data: stats } = useUserStats(!!user);
   useEffect(() => {
-    if (stats) {
+    if (stats && typeof stats === 'object') {
       if (stats.dyslexiaFont) document.body.classList.add('dyslexia-font');
       else document.body.classList.remove('dyslexia-font');
       
