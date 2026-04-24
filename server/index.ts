@@ -110,6 +110,14 @@ app.use((req, res, next) => {
       const indexPath = path.join(distPath, "index.html");
       
       if (fs.existsSync(indexPath)) {
+        // Log available assets for debugging
+        try {
+          const assets = fs.readdirSync(path.join(distPath, "assets"));
+          log(`Available assets: ${assets.join(", ")}`, "static");
+        } catch (e) {
+          log(`Could not list assets: ${e}`, "static");
+        }
+
         // EXTREME CACHE CONTROL: Force fresh index.html every time
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.setHeader("Pragma", "no-cache");
