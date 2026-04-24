@@ -6,6 +6,12 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
+console.log("[server] Entry point reached. ENV Check:", {
+  hasDbUrl: !!process.env.DATABASE_URL,
+  nodeEnv: process.env.NODE_ENV,
+  port: process.env.PORT
+});
+
 const app = express();
 const httpServer = createServer(app);
 
