@@ -118,9 +118,11 @@ app.use((req, res, next) => {
         
         // Ensure correct MIME type
         res.setHeader("Content-Type", "text/html");
+        res.setHeader("X-Served-By", "spa-fallback");
         res.sendFile(indexPath);
       } else {
         log(`SPA fallback failed: index.html missing at ${indexPath}`, "static");
+        res.setHeader("X-Served-By", "fallback-missing-index");
         next();
       }
     });

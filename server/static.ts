@@ -39,6 +39,7 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath, {
     maxAge: "1d",
     setHeaders: (res, filePath) => {
+      res.setHeader("X-Served-By", "express-static");
       // Long-term cache for hashed assets (Vite default)
       if (filePath.match(/[.-][a-z0-9]{8,}\.(js|css|png|jpg|jpeg|svg|webp|woff2?)$/i) || 
           filePath.includes("/assets/")) {
