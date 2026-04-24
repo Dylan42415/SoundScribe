@@ -22,10 +22,6 @@ export default defineConfig({
     emptyOutDir: true,
     target: "es2020",
   },
-  define: {
-    "process.env": {},
-    "global": "globalThis", 
-  },
   optimizeDeps: {
     exclude: ["@shared"],
   },
