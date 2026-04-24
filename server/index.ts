@@ -5,6 +5,9 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 const app = express();
 const httpServer = createServer(app);
@@ -36,6 +39,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // --- Security Layers ---
+/* 
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
@@ -53,6 +57,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: false,
 }));
+*/
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -86,6 +91,21 @@ app.use((req, res, next) => {
 
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
+    
+    // Robust SPA fallback directly in index.ts
+    app.get("*", (req, res) => {
+      if (req.path.startsWith("/api/")) return res.sendStatus(404);
+      
+      const distPath = path.resolve(process.cwd(), "dist", "public");
+      const indexPath = path.join(distPath, "index.html");
+      
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        log(`SPA fallback failed: index.html not found at ${indexPath}`, "static");
+        res.status(404).send("Application not found");
+      }
+    });
   }
 
   if (process.env.NODE_ENV !== "production") {

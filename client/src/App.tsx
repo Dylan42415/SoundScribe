@@ -15,6 +15,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { useUserStats } from "@/hooks/use-user";
 import { LanguageProvider } from "@/lib/i18n";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function ProtectedRoutes() {
   const { user, isLoading } = useAuth();
@@ -36,8 +37,12 @@ function ProtectedRoutes() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+        <div className="relative">
+          <div className="w-12 h-12 rounded-full border-4 border-primary/20 animate-pulse" />
+          <Loader2 className="w-12 h-12 animate-spin text-primary absolute inset-0" />
+        </div>
+        <p className="text-muted-foreground font-medium animate-pulse text-lg">Waking up SoundScribe...</p>
       </div>
     );
   }
@@ -64,7 +69,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <TooltipProvider>
-          <ProtectedRoutes />
+          <ErrorBoundary>
+            <ProtectedRoutes />
+          </ErrorBoundary>
           <Toaster />
         </TooltipProvider>
       </LanguageProvider>

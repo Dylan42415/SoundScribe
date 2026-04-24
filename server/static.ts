@@ -47,28 +47,7 @@ export function serveStatic(app: Express) {
     },
   }));
 
-  // 2. Catch-all: serve index.html for SPA navigation (Wouter/React Router)
-  app.get("*", (req, res, next) => {
-    // If it's an API route that reached here, it's a genuine 404 for the API
-    if (req.path.startsWith("/api/")) {
-      return res.status(404).json({ 
-        error: "Not Found", 
-        message: `API endpoint ${req.path} does not exist.` 
-      });
-    }
-
-    // Security & Caching for index.html (never cache the entry point)
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-
-    res.sendFile(indexPath, (err) => {
-      if (err && !res.headersSent) {
-        console.error(`[static] Error sending index.html:`, err);
-        res.status(500).send("Error loading application");
-      }
-    });
-  });
+  }));
 }
 
 /**
