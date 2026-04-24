@@ -16,10 +16,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist", "public"),
     emptyOutDir: true,
-    target: "esnext", // Ensure modern JS features are supported
+    target: "es2020", // Use a more stable target for better compatibility
+    cssTarget: "error", // Ensure CSS is also handled strictly
   },
   define: {
     "process.env": {},
+    "global": "window", // Some libraries expect 'global' to exist
   },
   optimizeDeps: {
     exclude: ["@shared"], // Don't try to pre-bundle the shared folder
