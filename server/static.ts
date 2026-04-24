@@ -8,10 +8,20 @@ export function serveStatic(app: Express) {
 
   console.log(`[static] Serving from: ${distPath}`);
 
+  // Manually serve assets to ensure they are found
+  app.get("/assets/:file", (req, res) => {
+    const filePath = path.resolve(distPath, "assets", req.params.file);
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).end();
+    }
+  });
+
   app.use(express.static(distPath));
 
   app.get("*", (req, res) => {
-    // Return 404 for missing assets/files
+    // Return 404 for missing files/api
     if (req.path.includes(".") || req.path.startsWith("/api")) {
       res.status(404).end();
       return;
