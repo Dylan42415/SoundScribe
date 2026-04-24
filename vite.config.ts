@@ -16,6 +16,13 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist", "public"),
     emptyOutDir: true,
+    target: "esnext", // Ensure modern JS features are supported
+  },
+  define: {
+    "process.env": {},
+  },
+  optimizeDeps: {
+    exclude: ["@shared"], // Don't try to pre-bundle the shared folder
   },
   server: {
     fs: {
