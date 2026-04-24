@@ -76,35 +76,6 @@ export const insertRecordingSchema = createInsertSchema(recordings).omit({
 export type Recording = typeof recordings.$inferSelect;
 export type InsertRecording = z.infer<typeof insertRecordingSchema>;
 
-// Relations
-export const userStatsRelations = relations(userStats, ({ one, many }) => ({
-  user: one(users, {
-    fields: [userStats.userId],
-    references: [users.id],
-  }),
-}));
-
-export const recordingsRelations = relations(recordings, ({ one, many }) => ({
-  user: one(users, {
-    fields: [recordings.userId],
-    references: [users.id],
-  }),
-  group: one(groups, {
-    fields: [recordings.groupId],
-    references: [groups.id],
-  }),
-  entities: many(entities),
-  relations: many(relationsTable),
-}));
-
-export const groupsRelations = relations(groups, ({ one, many }) => ({
-  user: one(users, {
-    fields: [groups.userId],
-    references: [users.id],
-  }),
-  recordings: many(recordings),
-}));
-
 // Knowledge Graph tables
 export const entities = pgTable("entities", {
   id: serial("id").primaryKey(),
@@ -134,6 +105,36 @@ export type Entity = typeof entities.$inferSelect;
 export type InsertEntity = typeof entities.$inferInsert;
 export type Relation = typeof relationsTable.$inferSelect;
 export type InsertRelation = typeof relationsTable.$inferInsert;
+
+// --- RELATIONS (Must be defined at the end after all tables are declared) ---
+
+export const userStatsRelations = relations(userStats, ({ one, many }) => ({
+  user: one(users, {
+    fields: [userStats.userId],
+    references: [users.id],
+  }),
+}));
+
+export const recordingsRelations = relations(recordings, ({ one, many }) => ({
+  user: one(users, {
+    fields: [recordings.userId],
+    references: [users.id],
+  }),
+  group: one(groups, {
+    fields: [recordings.groupId],
+    references: [groups.id],
+  }),
+  entities: many(entities),
+  relations: many(relationsTable),
+}));
+
+export const groupsRelations = relations(groups, ({ one, many }) => ({
+  user: one(users, {
+    fields: [groups.userId],
+    references: [users.id],
+  }),
+  recordings: many(recordings),
+}));
 
 export const entitiesRelations = relations(entities, ({ one, many }) => ({
   recording: one(recordings, {
