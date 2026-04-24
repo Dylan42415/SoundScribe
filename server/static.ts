@@ -30,111 +30,47 @@ export function serveStatic(app: Express) {
   console.log(`[static] Serving from: ${distPath}`);
   console.log(`[static] index.html exists: ${fs.existsSync(indexPath)}`);
 
-  // Log the assets directory contents for debugging
-  const assetsDir = path.join(distPath, "assets");
-  if (fs.existsSync(assetsDir)) {
-    const files = fs.readdirSync(assetsDir);
-    console.log(`[static] Assets (${files.length}): ${files.join(", ")}`);
-  } else {
-    console.warn(
-      `[static] WARNING: assets directory not found at ${assetsDir}`,
-    );
-  }
 
-  // Debug endpoint (remove after confirmed working)
-  app.get("/debug-static", (_req, res) => {
-    const assets = fs.existsSync(assetsDir)
-      ? fs.readdirSync(assetsDir)
-      : [];
-    res.json({
-      distPath,
-      indexExists: fs.existsSync(indexPath),
-      assets,
-      __dirname,
-      cwd: process.cwd(),
-    });
-  });
 
-  // Robust manual static file server to bypass any express.static / esbuild mangling issues
-  app.use((req, res, next) => {
-    if (req.method !== "GET" && req.method !== "HEAD") return next();
-    
-    // Don't intercept API routes
-    if (req.path.startsWith("/api")) return next();
-    
-    // Don't intercept root, let the catch-all handle index.html
-    if (req.path === "/") return next();
-
-    try {
-      const decodedPath = decodeURIComponent(req.path);
-      // Remove leading slash to join correctly with distPath
-      const relativePath = decodedPath.startsWith('/') ? decodedPath.slice(1) : decodedPath;
-      const filePath = path.join(distPath, relativePath);
-
-      if (!fs.existsSync(filePath)) {
-        return next();
-      }
-
-      const stat = fs.statSync(filePath);
-      if (stat.isDirectory()) {
-        return next();
-      }
-
-      // Add long cache for hashed assets in /assets/
-      if (req.path.startsWith("/assets/")) {
+  // Serve all static files from dist/public (assets, favicon, etc.)
+  app.use(express.static(distPath, {
+    maxAge: "1d", // Default for non-hashed files
+    setHeaders: (res, filePath) => {
+      // Long-term cache for hashed assets
+      if (filePath.includes(`${path.sep}assets${path.sep}`) || filePath.includes("/assets/")) {
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       }
+    },
+  }));
 
-      // Set MIME types manually to avoid any "Refused to apply style" errors
-      const ext = path.extname(filePath).toLowerCase();
-      const mimeTypes: Record<string, string> = {
-        ".css": "text/css; charset=utf-8",
-        ".js": "application/javascript; charset=utf-8",
-        ".svg": "image/svg+xml",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".ico": "image/x-icon",
-        ".json": "application/json",
-      };
-
-      if (mimeTypes[ext]) {
-        res.setHeader("Content-Type", mimeTypes[ext]);
-      }
-
-      // Stream the file
-      const stream = fs.createReadStream(filePath);
-      stream.pipe(res);
-    } catch (err) {
-      console.error(`[static] Error serving static file ${req.path}:`, err);
-      next();
-    }
-  });
-
-  // Catch-all: serve index.html ONLY for navigation requests (not assets/api)
+  // Catch-all: serve index.html for SPA navigation
   app.get("*", (req, res) => {
-    // If the path looks like a file request (has extension), return 404
-    if (req.path.includes(".")) {
-      console.warn(`[static] 404 for file: ${req.path}`);
-      return res.status(404).send("Not found");
-    }
-
-    // Don't catch API routes
+    // API requests should 404 if not handled by registerRoutes
     if (req.path.startsWith("/api")) {
       return res.status(404).json({ message: "Not found" });
     }
 
-    // Never cache index.html — it contains hashed asset references that change per build
+    // Asset requests that reached here means they weren't found in express.static
+    if (req.path.startsWith("/assets")) {
+      return res.status(404).send("Asset not found");
+    }
+
+    // Never cache index.html
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
+
     try {
-      const html = fs.readFileSync(indexPath, "utf-8");
-      res.send(html);
+      res.sendFile(indexPath, (err) => {
+        if (err && !res.headersSent) {
+          console.error(`[static] Error sending index.html:`, err);
+          res.status(500).send("Error reading application file");
+        }
+      });
     } catch (err) {
-      console.error(`[static] Error reading index.html:`, err);
+      console.error(`[static] Error serving index.html:`, err);
       if (!res.headersSent) {
-        res.status(500).send("Error reading application file");
+        res.status(500).send("Internal server error");
       }
     }
   });
