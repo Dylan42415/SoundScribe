@@ -3,8 +3,14 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Use a safe way to get __dirname that works in both ESM and CJS
+const getDirname = () => {
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return __dirname;
+  }
+};
 
 /**
  * Robust static file server for production.
@@ -67,8 +73,8 @@ function findDistPublic(): string | null {
   const candidates = [
     // Standard relative paths
     path.resolve(process.cwd(), "dist", "public"),
-    path.resolve(__dirname, "public"),
-    path.resolve(__dirname, "..", "dist", "public"),
+    path.resolve(getDirname(), "public"),
+    path.resolve(getDirname(), "..", "dist", "public"),
     // Fallback to project root public if dist is missing
     path.resolve(process.cwd(), "public"),
   ];
