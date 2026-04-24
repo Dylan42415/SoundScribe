@@ -91,11 +91,11 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production") {
     // Use express.static with absolute path for robust asset serving
     const distPath = path.resolve(process.cwd(), "dist", "public");
-    app.use("/static-v1", express.static(path.join(distPath, "static-v1"), {
+    app.use("/static-v4", express.static(path.join(distPath, "static-v4"), {
       immutable: true,
       maxAge: "1y",
       setHeaders: (res) => {
-        res.setHeader("X-Served-By", "express-static-v1");
+        res.setHeader("X-Served-By", "express-static-v4");
       }
     }));
 
