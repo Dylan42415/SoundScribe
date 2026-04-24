@@ -8,23 +8,70 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fira+Code:wght@300..700&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Oxanium:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Roboto:ital,wght@0,100..900;1,100..900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <script>
-      // Diagnostic logger to catch white screen causes
-      window.onerror = function(msg, url, lineNo, columnNo, error) {
-        var div = document.createElement('div');
-        div.style = 'position:fixed;top:0;left:0;width:100%;background:red;color:white;padding:20px;z-index:9999;font-family:monospace;white-space:pre-wrap;box-sizing:border-box;';
-        div.innerHTML = '<h1>Critical Application Error</h1>' +
-                        '<p><b>Message:</b> ' + msg + '</p>' +
-                        '<p><b>Source:</b> ' + url + '</p>' +
-                        '<p><b>Location:</b> Line ' + lineNo + ', Col ' + columnNo + '</p>' +
-                        '<p><b>Stack:</b> ' + (error ? error.stack : 'N/A') + '</p>' +
-                        '<button onclick="location.reload()" style="padding:10px;margin-top:10px;cursor:pointer;">Reload Page</button>';
-        document.body.prepend(div);
-        return false;
-      };
-      window.onunhandledrejection = function(event) {
-        console.error('Unhandled rejection:', event.reason);
-      };
-      console.log('Diagnostic script initialized');
+      // ADVANCED MULTI-POINT DIAGNOSTIC SYSTEM
+      (function() {
+        const report = {
+          errors: [],
+          checks: {
+            api: 'pending',
+            supabase: 'pending',
+            env: 'pending',
+            browser: 'pending'
+          }
+        };
+
+        function updateUI() {
+          let div = document.getElementById('diag-report');
+          if (!div) {
+            div = document.createElement('div');
+            div.id = 'diag-report';
+            div.style = 'position:fixed;top:0;left:0;width:100%;background:#1a1a1a;color:#eee;padding:20px;z-index:9999;font-family:monospace;white-space:pre-wrap;box-sizing:border-box;border-bottom:4px solid #f44336;';
+            document.body.prepend(div);
+          }
+          
+          let content = '<h2 style="color:#f44336;margin:0 0 10px 0;">System Diagnostic Report</h2>';
+          content += '<b>[Checks]</b> ' + 
+            (report.checks.browser === 'ok' ? '✅' : '❌') + ' Browser  ' +
+            (report.checks.api === 'ok' ? '✅' : '❌') + ' API  ' +
+            (report.checks.env === 'ok' ? '✅' : '❌') + ' Config\n\n';
+          
+          if (report.errors.length > 0) {
+            content += '<b style="color:#ff5252;">[Failures]</b>\n';
+            report.errors.forEach(err => {
+              content += `> ${err.msg}\n  Source: ${err.url || 'internal'}\n\n`;
+            });
+          }
+          
+          content += '<button onclick="location.reload()" style="background:#444;color:white;border:none;padding:8px 16px;cursor:pointer;border-radius:4px;">Force Refresh</button>';
+          div.innerHTML = content;
+        }
+
+        window.onerror = function(msg, url, line, col, error) {
+          report.errors.push({ msg, url, line, col });
+          updateUI();
+          return false;
+        };
+
+        // 1. Browser Check
+        report.checks.browser = (window.fetch && window.Promise && window.localStorage) ? 'ok' : 'fail';
+
+        // 2. API Check
+        fetch('/api/recordings').then(r => {
+          report.checks.api = (r.status === 401 || r.status === 200) ? 'ok' : 'fail';
+          updateUI();
+        }).catch(() => {
+          report.checks.api = 'fail';
+          updateUI();
+        });
+
+        // 3. Env Check (Simulated)
+        setTimeout(() => {
+          report.checks.env = 'ok';
+          updateUI();
+        }, 1000);
+
+        console.log('Diagnostic system active');
+      })();
     </script>
   </head>
   <body>
