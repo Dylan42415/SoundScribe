@@ -21,18 +21,7 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist", "public"),
     emptyOutDir: true,
     target: "es2020",
-    minify: "terser", 
-    terserOptions: {
-      compress: {
-        passes: 2,
-      },
-      format: {
-        comments: false,
-      },
-    },
-  },
-  optimizeDeps: {
-    exclude: ["@shared"],
+    minify: true,
   },
   server: {
     fs: {
