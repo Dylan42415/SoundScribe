@@ -38,8 +38,25 @@ export const recordings = pgTable("recordings", {
   rawKnowledgeGraph: jsonb("raw_knowledge_graph"), // JSON structure for entities/relations (semantic strict)
   studyGuide: jsonb("study_guide"), // JSON array of Q&A
   wordTimings: jsonb("word_timings"), // [{word, start, end}] from Whisper word-level timestamps
+  translations: jsonb("translations").default({}), // Map of language codes to translated transcripts
+  groupId: integer("group_id").references(() => groups.id, { onDelete: "set null" }),
+  notes: jsonb("notes").default({ content: "", pinned: false }),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Groups for organizing recordings
+export const groups = pgTable("groups", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  color: text("color").default("#3b82f6"), // Default blue
+  icon: text("icon").default("Folder"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGroupSchema = createInsertSchema(groups).omit({ id: true, createdAt: true, userId: true });
+export type Group = typeof groups.$inferSelect;
+export type InsertGroup = z.infer<typeof insertGroupSchema>;
 
 export const insertRecordingSchema = createInsertSchema(recordings).omit({ 
   id: true, 
@@ -49,7 +66,11 @@ export const insertRecordingSchema = createInsertSchema(recordings).omit({
   summary: true,
   mindMap: true,
   knowledgeGraph: true,
-  studyGuide: true 
+  studyGuide: true,
+  translations: true,
+  groupId: true,
+  userId: true,
+  notes: true
 });
 
 export type Recording = typeof recordings.$inferSelect;
@@ -68,8 +89,20 @@ export const recordingsRelations = relations(recordings, ({ one, many }) => ({
     fields: [recordings.userId],
     references: [users.id],
   }),
+  group: one(groups, {
+    fields: [recordings.groupId],
+    references: [groups.id],
+  }),
   entities: many(entities),
   relations: many(relationsTable),
+}));
+
+export const groupsRelations = relations(groups, ({ one, many }) => ({
+  user: one(users, {
+    fields: [groups.userId],
+    references: [users.id],
+  }),
+  recordings: many(recordings),
 }));
 
 // Knowledge Graph tables

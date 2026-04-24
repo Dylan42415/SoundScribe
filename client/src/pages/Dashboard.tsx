@@ -9,10 +9,12 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { Clock, BookOpen, Trophy, ArrowRight, Loader2, Mic } from "lucide-react";
 import { Link } from "wouter";
 import { useMemo } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useUserStats();
   const { data: recordings, isLoading: recordingsLoading } = useRecordings();
+  const { t } = useTranslation();
 
   // Real calculations for metrics
   const totalSeconds = recordings?.reduce((acc, rec) => acc + (rec.duration || 0), 0) || 0;
@@ -56,15 +58,15 @@ export default function Dashboard() {
         <div className="flex justify-between items-end">
           <div>
             <h1 className="font-heading text-3xl font-bold text-foreground">
-              Hello, Learner! 👋
+              {t("dashboard.hello")}
             </h1>
             <p className="text-muted-foreground mt-2">
-              Ready to turn some audio into knowledge today?
+              {t("dashboard.subtitle")}
             </p>
           </div>
           <Link href="/recordings">
              <Button variant="outline" className="hidden sm:flex items-center gap-2">
-               View All Recordings <ArrowRight className="w-4 h-4" />
+               {t("dashboard.viewAll")} <ArrowRight className="w-4 h-4" />
              </Button>
           </Link>
         </div>
@@ -77,7 +79,7 @@ export default function Dashboard() {
                 <Clock className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Study Time Saved</p>
+                <p className="text-sm font-medium text-muted-foreground">{t("dashboard.studyTime")}</p>
                 <h3 className="text-2xl font-bold text-foreground">{studyTimeSavedHrs} hrs</h3>
               </div>
             </div>
@@ -89,7 +91,7 @@ export default function Dashboard() {
                 <BookOpen className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Recordings</p>
+                <p className="text-sm font-medium text-muted-foreground">{t("dashboard.totalRecordings")}</p>
                 <h3 className="text-2xl font-bold text-foreground">{recordings?.length || 0}</h3>
               </div>
             </div>
@@ -102,7 +104,7 @@ export default function Dashboard() {
           {/* Main Content: Recent Recordings */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-heading text-xl font-semibold">Recent Activity</h2>
+              <h2 className="font-heading text-xl font-semibold">{t("dashboard.recentActivity")}</h2>
             </div>
 
             {recentRecordings.length > 0 ? (
@@ -114,8 +116,8 @@ export default function Dashboard() {
             ) : (
               <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed">
                 <Mic className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-muted-foreground">No recordings yet</h3>
-                <p className="text-sm text-muted-foreground/80 mb-6">Start recording to see your content here.</p>
+                <h3 className="text-lg font-medium text-muted-foreground">{t("dashboard.noRecordings")}</h3>
+                <p className="text-sm text-muted-foreground/80 mb-6">{t("dashboard.startRecording")}</p>
               </div>
             )}
           </div>
@@ -123,7 +125,7 @@ export default function Dashboard() {
           {/* Sidebar Content: Chart & Tips */}
           <div className="space-y-6">
             <Card className="p-6">
-              <h3 className="font-heading font-semibold mb-6">Weekly Activity</h3>
+              <h3 className="font-heading font-semibold mb-6">{t("dashboard.weeklyActivity")}</h3>
               <div className="h-[200px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
@@ -139,9 +141,9 @@ export default function Dashboard() {
             </Card>
             
             <Card className="p-6 bg-secondary/5 border-secondary/20">
-              <h3 className="font-heading font-semibold text-secondary mb-2">Did you know?</h3>
+              <h3 className="font-heading font-semibold text-secondary mb-2">{t("dashboard.didYouKnow")}</h3>
               <p className="text-sm text-muted-foreground">
-                Using the "Dyslexia Friendly" font in settings can increase reading speed by up to 20% for some users.
+                {t("dashboard.didYouKnowText")}
               </p>
             </Card>
           </div>

@@ -141,6 +141,98 @@ export async function registerRoutes(
     res.sendStatus(204);
   });
 
+  app.patch(api.recordings.updateNotes.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = Number(req.params.id);
+    const userId = (req.user as any).claims.sub;
+
+    const recording = await storage.getRecording(id);
+    if (!recording) return res.status(404).json({ message: "Recording not found" });
+    if (recording.userId !== userId) return res.sendStatus(403);
+
+    const input = api.recordings.updateNotes.input.parse(req.body);
+    const updated = await storage.updateRecording(id, { 
+      notes: {
+        ...(recording.notes as any || {}),
+        ...input,
+        lastEdited: new Date().toISOString()
+      }
+    });
+    res.json(updated);
+  });
+
+  // --- Groups ---
+  app.get(api.groups.list.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).claims.sub;
+    const groups = await storage.getGroups(userId);
+    res.json(groups);
+  });
+
+  app.post(api.groups.create.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).claims.sub;
+    
+    try {
+      const input = api.groups.create.input.parse(req.body);
+      const group = await storage.createGroup({
+        ...input,
+        userId,
+      });
+      res.status(201).json(group);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.groups.update.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = Number(req.params.id);
+    const group = await storage.getGroup(id);
+    if (!group) return res.status(404).json({ message: "Group not found" });
+    if (group.userId !== (req.user as any).claims.sub) return res.sendStatus(403);
+
+    const input = api.groups.update.input.parse(req.body);
+    const updatedGroup = await storage.updateGroup(id, input);
+    res.json(updatedGroup);
+  });
+
+  app.delete(api.groups.delete.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = Number(req.params.id);
+    const group = await storage.getGroup(id);
+    if (!group) return res.status(404).json({ message: "Group not found" });
+    if (group.userId !== (req.user as any).claims.sub) return res.sendStatus(403);
+
+    await storage.deleteGroup(id);
+    res.sendStatus(204);
+  });
+
+  app.patch(api.groups.assignRecordings.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = Number(req.params.id);
+    const userId = (req.user as any).claims.sub;
+
+    // Special case: id 0 or -1 could mean "Ungrouped" (null)
+    const groupId = id <= 0 ? null : id;
+
+    if (groupId !== null) {
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.userId !== userId) return res.sendStatus(403);
+    }
+
+    const input = api.groups.assignRecordings.input.parse(req.body);
+    await storage.assignRecordingsToGroup(input.recordingIds, groupId);
+    res.json({ success: true });
+  });
+
   // --- AI Processing ---
   app.post(api.recordings.process.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -572,6 +664,230 @@ Return ONLY valid JSON — no prose, no markdown:
     } catch (error) {
       console.error("Quiz generation error:", error);
       res.status(500).json({ message: "Quiz generation failed" });
+    }
+  });
+
+  app.post("/api/recordings/:id/translate", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).claims.sub;
+    const id = Number(req.params.id);
+    const { targetLanguage } = req.body;
+
+    if (!targetLanguage) return res.status(400).json({ message: "targetLanguage is required" });
+
+    const recording = await storage.getRecording(id);
+    if (!recording) return res.status(404).json({ message: "Not found" });
+    if (recording.userId !== userId) return res.sendStatus(403);
+
+    const translations = (recording.translations as Record<string, string>) || {};
+    
+    // Cache hit
+    if (translations[targetLanguage]) {
+      return res.json({ translatedText: translations[targetLanguage] });
+    }
+
+    if (!recording.transcript) {
+       return res.status(400).json({ message: "No transcript available to translate" });
+    }
+
+    try {
+      const prompt = `
+        Translate the following transcript into the language with code: ${targetLanguage}.
+        
+        CRITICAL RULES:
+        - You MUST maintain EXACTLY the same number of lines and blocks as the original.
+        - You MUST preserve all timestamp markers exactly as they are (e.g. "[0:12 - 0:15]" or "[0:12]").
+        - Only translate the spoken text. Do not add any conversational text or formatting.
+        
+        Transcript:
+        ${recording.transcript}
+      `;
+
+      const completion = await openai.chat.completions.create({
+        model: process.env.ANALYSIS_MODEL || "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const translatedText = completion.choices[0].message.content || "";
+
+      // Save to cache
+      const updatedTranslations = { ...translations, [targetLanguage]: translatedText };
+      await storage.updateRecording(id, { translations: updatedTranslations });
+
+      res.json({ translatedText });
+    } catch (error) {
+      console.error("Translation error:", error);
+      res.status(500).json({ message: "Translation failed" });
+    }
+  });
+
+  // Batch-translate study content (KG nodes/edges, flashcards, insights, key concepts, quiz)
+  app.post("/api/recordings/:id/translate-study", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).claims.sub;
+    const id = Number(req.params.id);
+    const { targetLanguage } = req.body;
+
+    if (!targetLanguage) return res.status(400).json({ message: "targetLanguage is required" });
+    if (targetLanguage === "en") return res.json({ cached: true });
+
+    const recording = await storage.getRecording(id);
+    if (!recording) return res.status(404).json({ message: "Not found" });
+    if (recording.userId !== userId) return res.sendStatus(403);
+
+    const translations = (recording.translations as Record<string, any>) || {};
+    const cacheKey = `study_${targetLanguage}`;
+    const force = req.query.force === "true";
+
+    // Cache validation: Ensure the cached object has all the required structures.
+    // If it's an "old" cache (missing summary or rawKnowledgeGraph), we re-translate.
+    const cached = translations[cacheKey];
+    const isCacheValid = cached && 
+                         (recording.knowledgeGraph ? !!cached.knowledgeGraph : true) &&
+                         (recording.rawKnowledgeGraph ? !!cached.rawKnowledgeGraph : true) &&
+                         (recording.summary ? !!cached.summary : true);
+
+    if (cached && isCacheValid && !force) {
+      return res.json(cached);
+    }
+
+    const studyGuide = recording.studyGuide as any;
+    const kg = recording.knowledgeGraph as any;
+    const rawKg = recording.rawKnowledgeGraph as any;
+    const summary = recording.summary;
+
+    if (!studyGuide && !kg && !rawKg && !summary) {
+      return res.status(400).json({ message: "No study content to translate" });
+    }
+
+    try {
+      // Build a compact payload of only the translatable text fields
+      const payload: any = {};
+
+      if (summary) payload.summary = summary;
+      
+      if (kg?.entities?.length) {
+        payload.kgEntities = kg.entities.map((e: any) => ({
+          id: e.id,
+          label: e.label || "",
+          description: e.description || "",
+        }));
+      }
+      if (kg?.relations?.length) {
+        payload.kgRelations = kg.relations.map((r: any) => ({
+          source: r.source,
+          target: r.target,
+          label: r.label || "",
+        }));
+      }
+
+      if (rawKg?.entities?.length) {
+        payload.rawKgEntities = rawKg.entities.map((e: any) => ({
+          id: e.id,
+          label: e.label || "",
+          description: e.description || "",
+        }));
+      }
+      if (rawKg?.relations?.length) {
+        payload.rawKgRelations = rawKg.relations.map((r: any) => ({
+          source: r.source,
+          target: r.target,
+          label: r.label || "",
+        }));
+      }
+      if (studyGuide?.keyConcepts?.length) {
+        payload.keyConcepts = studyGuide.keyConcepts.map((c: any) => ({
+          title: c.title || "",
+          explanation: c.explanation || "",
+        }));
+      }
+      if (studyGuide?.insights?.length) {
+        payload.insights = studyGuide.insights.map((i: any) => ({
+          title: i.title || "",
+          explanation: i.explanation || "",
+        }));
+      }
+      if (studyGuide?.quiz?.length) {
+        payload.quiz = studyGuide.quiz.map((q: any) => ({
+          question: q.question || "",
+          options: q.options || [],
+          answer: q.answer || "",
+          explanation: q.explanation || "",
+        }));
+      }
+
+      const prompt = `Translate ALL text values in the following JSON object into the language with code: ${targetLanguage}.
+
+CRITICAL RULES:
+- Return ONLY valid JSON with the EXACT same structure and keys.
+- Translate every string value (labels, descriptions, titles, explanations, questions, options, answers).
+- Do NOT translate or modify the "id", "source", "target" fields — they are reference IDs.
+- Keep the same array lengths and object shapes.
+- Do NOT add any prose, markdown, or explanation outside the JSON.
+
+JSON to translate:
+${JSON.stringify(payload)}`;
+
+      const completion = await openai.chat.completions.create({
+        model: process.env.ANALYSIS_MODEL || "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+
+      const translated = JSON.parse(completion.choices[0].message.content || "{}");
+
+      // Structure the response
+      const result: any = {
+        summary: translated.summary || null
+      };
+
+      if (translated.kgEntities) {
+        result.knowledgeGraph = {
+          entities: translated.kgEntities,
+          relations: translated.kgRelations || [],
+        };
+      }
+      if (translated.rawKgEntities) {
+        result.rawKnowledgeGraph = {
+          entities: translated.rawKgEntities,
+          relations: translated.rawKgRelations || [],
+        };
+      }
+      if (translated.keyConcepts) result.keyConcepts = translated.keyConcepts;
+      if (translated.insights) result.insights = translated.insights;
+      if (translated.quiz) result.quiz = translated.quiz;
+
+      // Cache the result
+      const updatedTranslations = { ...translations, [cacheKey]: result };
+      await storage.updateRecording(id, { translations: updatedTranslations });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Study content translation error:", error);
+      res.status(500).json({ message: "Translation of study content failed" });
+    }
+  });
+
+  // Translate arbitrary text (for study guide summary, insights, etc.)
+  app.post("/api/recordings/:id/translate-text", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const { text, targetLanguage } = req.body;
+    if (!text || !targetLanguage) return res.status(400).json({ message: "text and targetLanguage required" });
+    if (targetLanguage === "en") return res.json({ translatedText: text });
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: process.env.ANALYSIS_MODEL || "llama-3.3-70b-versatile",
+        messages: [{
+          role: "user",
+          content: `Translate the following text into the language with code: ${targetLanguage}. Preserve all HTML tags if present. Return ONLY the translated text, nothing else.\n\n${text}`
+        }],
+      });
+      const translatedText = completion.choices[0].message.content || text;
+      res.json({ translatedText });
+    } catch (error) {
+      console.error("Text translation error:", error);
+      res.status(500).json({ message: "Translation failed" });
     }
   });
 

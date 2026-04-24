@@ -7,7 +7,15 @@ const openai = new OpenAI({
   baseURL: "https://api.groq.com/openai/v1",
 });
 
-const GROUNDED_SYSTEM = (ctx: string) => `You are an expert learning assistant and knowledge graph analyst embedded in SoundScribe.
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  zh: "Chinese (Simplified)",
+};
+
+const GROUNDED_SYSTEM = (ctx: string, lang = "en") => `You are an expert learning assistant and knowledge graph analyst embedded in SoundScribe.
 
 You have been given a Knowledge Graph extracted from a lecture. Help the user learn from it in two ways:
 
@@ -19,12 +27,14 @@ RULES:
 - For structural questions, explicitly reference the centrality numbers and justify your recommendation.
 - Keep answers concise, clear, and educational.
 - If the context genuinely has nothing relevant, say so briefly rather than guessing.
+- You MUST respond in ${LANGUAGE_NAMES[lang] || "English"}. Translate all your responses to this language.
 
 ${ctx}`;
 
-const HYBRID_SYSTEM = (ctx: string) => `You are a helpful learning assistant for SoundScribe.
+const HYBRID_SYSTEM = (ctx: string, lang = "en") => `You are a helpful learning assistant for SoundScribe.
 
 If Knowledge Graph context is provided below, prioritise it. For general questions or greetings, respond naturally.
+You MUST respond in ${LANGUAGE_NAMES[lang] || "English"}. Translate all your responses to this language.
 
 ${ctx || "No specific entities matched this query. Provide a general helpful response."}`;
 
@@ -88,7 +98,7 @@ export function registerChatRoutes(app: Express): void {
   app.post("/api/conversations/:id/messages", async (req: Request, res: Response) => {
     try {
       const conversationId = parseInt(req.params.id);
-      const { content, recordingId } = req.body;
+      const { content, recordingId, language = "en" } = req.body;
       const recId = recordingId ? parseInt(String(recordingId)) : undefined;
 
       // 1. Retrieve relevant KG context, scoped to this recording
@@ -106,8 +116,8 @@ export function registerChatRoutes(app: Express): void {
 
       // 2. Build system prompt
       const useGrounded = kgContext && !fallback;
-      console.log(`[Chat Route] mode=${useGrounded ? "grounded" : "hybrid"} recordingId=${recId}`);
-      const systemMessage = useGrounded ? GROUNDED_SYSTEM(kgContext) : HYBRID_SYSTEM(kgContext);
+      console.log(`[Chat Route] mode=${useGrounded ? "grounded" : "hybrid"} recordingId=${recId} lang=${language}`);
+      const systemMessage = useGrounded ? GROUNDED_SYSTEM(kgContext, language) : HYBRID_SYSTEM(kgContext, language);
 
       const systemPrompt = { role: "system" as const, content: systemMessage };
 

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/lib/i18n";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,6 +23,7 @@ export function KnowledgeGraphChat({ recordingId }: KnowledgeGraphChatProps) {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { language } = useTranslation();
 
   // Initialize or fetch conversation
   useEffect(() => {
@@ -81,7 +83,7 @@ export function KnowledgeGraphChat({ recordingId }: KnowledgeGraphChatProps) {
       const response = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: userMessage, recordingId }),
+        body: JSON.stringify({ content: userMessage, recordingId, language }),
       });
 
       if (!response.ok) throw new Error('Failed to send message');

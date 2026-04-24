@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -34,6 +35,18 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
+// --- Security Layers ---
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "img-src": ["'self'", "data:", "https:", "http:"],
+      "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      "connect-src": ["'self'", "https:", "http:", "ws:", "wss:"],
+    },
+  },
+}));
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -61,7 +74,20 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // Sanitize sensitive data from logs
+        const sanitized = JSON.parse(JSON.stringify(capturedJsonResponse));
+        const sensitiveKeys = ["password", "token", "auth_token", "secret", "apiKey"];
+        const mask = (obj: any) => {
+          for (const key in obj) {
+            if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk))) {
+              obj[key] = "[MASKED]";
+            } else if (typeof obj[key] === "object") {
+              mask(obj[key]);
+            }
+          }
+        };
+        mask(sanitized);
+        logLine += ` :: ${JSON.stringify(sanitized)}`;
       }
 
       log(logLine);

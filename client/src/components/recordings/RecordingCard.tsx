@@ -2,8 +2,9 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mic, PlayCircle, FileText, BrainCircuit, Clock, Trash2, Loader2, Sparkles } from "lucide-react";
+import { Mic, PlayCircle, FileText, BrainCircuit, Clock, Trash2, Loader2, Sparkles, Folder } from "lucide-react";
 import { useDeleteRecording } from "@/hooks/use-recordings";
+import { useGroups } from "@/hooks/use-groups";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -24,10 +25,13 @@ interface Props {
 
 export function RecordingCard({ recording }: Props) {
   const deleteMutation = useDeleteRecording();
+  const { groups } = useGroups();
 
   const isProcessing = recording.status === "processing";
   const isCompleted = recording.status === "completed";
   const isFailed = recording.status === "failed";
+
+  const group = groups.find(g => g.id === recording.groupId);
 
   return (
     <Card className="interactive-card relative overflow-hidden group">
@@ -52,6 +56,15 @@ export function RecordingCard({ recording }: Props) {
                 <span>{format(new Date(recording.createdAt!), "MMM d, yyyy • h:mm a")}</span>
                 <span>•</span>
                 <span>{Math.round(recording.duration / 60)} mins</span>
+                {group && (
+                  <>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <Folder className="w-3 h-3" style={{ color: group.color || undefined }} />
+                      <span>{group.name}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

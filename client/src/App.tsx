@@ -14,6 +14,7 @@ import Login from "@/pages/Login";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { useUserStats } from "@/hooks/use-user";
+import { LanguageProvider } from "@/lib/i18n";
 
 function ProtectedRoutes() {
   const { user, isLoading } = useAuth();
@@ -61,10 +62,12 @@ function ProtectedRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ProtectedRoutes />
-        <Toaster />
-      </TooltipProvider>
+      <LanguageProvider>
+        <TooltipProvider>
+          <ProtectedRoutes />
+          <Toaster />
+        </TooltipProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }

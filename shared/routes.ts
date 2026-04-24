@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertRecordingSchema, recordings, userStats } from './schema';
+import { insertRecordingSchema, recordings, userStats, groups, insertGroupSchema } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -88,6 +88,69 @@ export const api = {
       path: '/api/recordings/:id/quiz',
       responses: {
         200: z.custom<typeof recordings.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    updateNotes: {
+      method: 'PATCH' as const,
+      path: '/api/recordings/:id/notes',
+      input: z.object({
+        content: z.string(),
+        pinned: z.boolean().optional(),
+        metadata: z.any().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof recordings.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  groups: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/groups',
+      responses: {
+        200: z.array(z.custom<typeof groups.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/groups',
+      input: insertGroupSchema,
+      responses: {
+        201: z.custom<typeof groups.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/groups/:id',
+      input: z.object({
+        name: z.string().optional(),
+        color: z.string().optional(),
+        icon: z.string().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof groups.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/groups/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+    assignRecordings: {
+      method: 'PATCH' as const,
+      path: '/api/groups/:id/recordings',
+      input: z.object({
+        recordingIds: z.array(z.number()),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
         404: errorSchemas.notFound,
       },
     },

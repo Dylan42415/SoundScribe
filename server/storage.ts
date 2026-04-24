@@ -1,13 +1,14 @@
 import { db } from "./db";
 import { 
   userStats, recordings, users,
-  entities, relationsTable,
+  entities, relationsTable, groups,
   type UserStats, type InsertUserStats,
   type Recording, type InsertRecording,
   type Entity, type InsertEntity,
-  type Relation, type InsertRelation
+  type Relation, type InsertRelation,
+  type Group, type InsertGroup
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   getUserStats(userId: string): Promise<UserStats | undefined>;
@@ -24,6 +25,13 @@ export interface IStorage {
   createRelation(relation: InsertRelation): Promise<Relation>;
   clearKG(recordingId: number): Promise<void>;
   getUser(id: string): Promise<any>;
+  // Groups
+  getGroups(userId: string): Promise<Group[]>;
+  getGroup(id: number): Promise<Group | undefined>;
+  createGroup(group: InsertGroup): Promise<Group>;
+  updateGroup(id: number, updates: Partial<Group>): Promise<Group>;
+  deleteGroup(id: number): Promise<void>;
+  assignRecordingsToGroup(recordingIds: number[], groupId: number | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -103,6 +111,44 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<any> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
+  }
+
+  // Groups
+  async getGroups(userId: string): Promise<Group[]> {
+    return await db.select().from(groups).where(eq(groups.userId, userId));
+  }
+
+  async getGroup(id: number): Promise<Group | undefined> {
+    const [group] = await db.select().from(groups).where(eq(groups.id, id));
+    return group;
+  }
+
+  async createGroup(group: InsertGroup): Promise<Group> {
+    const [newGroup] = await db.insert(groups).values(group).returning();
+    return newGroup;
+  }
+
+  async updateGroup(id: number, updates: Partial<Group>): Promise<Group> {
+    const [updated] = await db
+      .update(groups)
+      .set(updates)
+      .where(eq(groups.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGroup(id: number): Promise<void> {
+    await db.delete(groups).where(eq(groups.id, id));
+  }
+
+  async assignRecordingsToGroup(recordingIds: number[], groupId: number | null): Promise<void> {
+    if (recordingIds.length === 0) return;
+    
+    // Using a simple loop for updates as drizzle batch update syntax varies by version/driver
+    // For production, a single update with `inArray` would be better
+    for (const id of recordingIds) {
+      await db.update(recordings).set({ groupId }).where(eq(recordings.id, id));
+    }
   }
 }
 

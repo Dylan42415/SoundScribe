@@ -13,6 +13,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { useTranslation } from "@/lib/i18n";
 
 type TranscriptSegment = { time: string | null; text: string; index: number };
 type WordToken = { segIndex: number; wordIndex: number; word: string; startSec: number; endSec: number };
@@ -134,6 +135,13 @@ export default function RecordingDetail() {
   const wordTokensRef = useRef<WordToken[]>([]);
   const activeWordKeyRef = useRef<string | null>(null);
   const lastSegmentTimeRef = useRef<number>(-1);
+  
+  const { language } = useTranslation();
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationFailed, setTranslationFailed] = useState(false);
+  const [translatedStudyData, setTranslatedStudyData] = useState<any>(null);
+  const [isTranslatingContent, setIsTranslatingContent] = useState(false);
 
   // Bug 6 fix: resolve Supabase storage path to a signed URL
   useEffect(() => {
@@ -264,19 +272,111 @@ export default function RecordingDetail() {
   });
 
   const studyData = recording?.studyGuide as any;
-  const keyConcepts = studyData?.keyConcepts || [];
-  const insights = studyData?.insights || [];
-  const quiz = studyData?.quiz || [];
+  const keyConcepts = (language !== 'en' && translatedStudyData?.keyConcepts) 
+    ? translatedStudyData.keyConcepts 
+    : (studyData?.keyConcepts || []);
+  const insights = (language !== 'en' && translatedStudyData?.insights) 
+    ? translatedStudyData.insights 
+    : (studyData?.insights || []);
+  const quiz = (language !== 'en' && translatedStudyData?.quiz) 
+    ? translatedStudyData.quiz 
+    : (studyData?.quiz || []);
 
   const transcriptSegments = useMemo(
     () => (recording?.transcript ? parseTranscript(recording.transcript) : []),
     [recording?.transcript]
   );
 
+  const translatedSegments = useMemo(
+    () => (translatedText ? parseTranscript(translatedText) : null),
+    [translatedText]
+  );
+
   const hasTimestamps = useMemo(
     () => transcriptSegments.some(s => s.time !== null),
     [transcriptSegments]
   );
+
+  // Handle translation fetching
+  useEffect(() => {
+    if (!recording?.transcript) return;
+    
+    // Assuming English is the original language
+    if (language === 'en') {
+      setTranslatedText(null);
+      setTranslationFailed(false);
+      return;
+    }
+    
+    let isMounted = true;
+    const fetchTranslation = async () => {
+      setIsTranslating(true);
+      setTranslationFailed(false);
+      try {
+        const url = buildUrl(`/api/recordings/${id}/translate`);
+        const res = await fetch(url, { 
+          method: "POST", 
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetLanguage: language })
+        });
+        
+        if (!res.ok) throw new Error("Translation failed");
+        
+        const data = await res.json();
+        if (isMounted) {
+          setTranslatedText(data.translatedText);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setTranslationFailed(true);
+      } finally {
+        if (isMounted) setIsTranslating(false);
+      }
+    };
+    
+    fetchTranslation();
+    
+    return () => { isMounted = false; };
+  }, [language, recording?.transcript, id]);
+
+  const translatedSummary = (language !== 'en' && translatedStudyData?.summary)
+    ? translatedStudyData.summary
+    : null;
+
+  // Translate all study content (KG, flashcards, insights, key concepts, quiz, summary) when language changes
+  useEffect(() => {
+    if (!recording?.studyGuide && !recording?.knowledgeGraph) return;
+    
+    if (language === 'en') {
+      setTranslatedStudyData(null);
+      return;
+    }
+    
+    let isMounted = true;
+    const fetchStudyTranslation = async () => {
+      setIsTranslatingContent(true);
+      try {
+        const res = await fetch(`/api/recordings/${id}/translate-study`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetLanguage: language }),
+        });
+        if (!res.ok) throw new Error("Study content translation failed");
+        const data = await res.json();
+        if (isMounted) setTranslatedStudyData(data);
+      } catch (err) {
+        console.error("Study translation error:", err);
+        if (isMounted) setTranslatedStudyData(null);
+      } finally {
+        if (isMounted) setIsTranslatingContent(false);
+      }
+    };
+    
+    fetchStudyTranslation();
+    return () => { isMounted = false; };
+  }, [language, recording?.studyGuide, recording?.knowledgeGraph, id]);
 
   const wordTimings = useMemo(
     () => (recording?.wordTimings as WordTiming[] | null) ?? null,
@@ -382,14 +482,63 @@ export default function RecordingDetail() {
         </div>
       );
     }
+
+    // Merge translated KG data over originals when available
+    const translatedKg = translatedStudyData?.knowledgeGraph;
+    const translatedRawKg = translatedStudyData?.rawKnowledgeGraph;
+    
+    let displayEntities = kgData.entities;
+    let displayRelations = kgData.relations;
+    let displayRawEntities = rawKgData?.entities;
+    let displayRawRelations = rawKgData?.relations;
+
+    if (language !== 'en' && (translatedKg || translatedRawKg)) {
+      // Helper for merging
+      const mergeTranslations = (originals: any[], translations: any[]) => {
+        if (!translations) return originals;
+        const transMap = new Map(translations.map((t: any) => [t.id, t]));
+        return originals.map((o: any) => {
+          const t = transMap.get(o.id || o.entityId);
+          return t ? { ...o, label: t.label || o.label, description: t.description || o.description } : o;
+        });
+      };
+
+      const mergeRelTranslations = (originals: any[], translations: any[]) => {
+        if (!translations) return originals;
+        const transMap = new Map(translations.map((t: any) => [`${t.source}|${t.target}`, t]));
+        return originals.map((o: any) => {
+          const key = `${o.source || o.from}|${o.target || o.to}`;
+          const t = transMap.get(key);
+          return t ? { ...o, label: t.label || o.label } : o;
+        });
+      };
+
+      if (translatedKg) {
+        displayEntities = mergeTranslations(kgData.entities, translatedKg.entities);
+        displayRelations = mergeRelTranslations(kgData.relations, translatedKg.relations);
+      }
+      
+      if (translatedRawKg) {
+        displayRawEntities = mergeTranslations(rawKgData?.entities || [], translatedRawKg.entities);
+        displayRawRelations = mergeRelTranslations(rawKgData?.relations || [], translatedRawKg.relations);
+      }
+    }
+
     return (
-      <KnowledgeGraph
-        recordingId={id}
-        entities={kgData.entities}
-        relations={kgData.relations}
-        rawEntities={rawKgData?.entities}
-        rawRelations={rawKgData?.relations}
-      />
+      <>
+        {isTranslatingContent && language !== 'en' && !translatedStudyData && (
+          <div className="mb-2 text-center text-xs text-muted-foreground animate-pulse">
+            Translating knowledge graph...
+          </div>
+        )}
+        <KnowledgeGraph
+          recordingId={id}
+          entities={displayEntities}
+          relations={displayRelations}
+          rawEntities={displayRawEntities}
+          rawRelations={displayRawRelations}
+        />
+      </>
     );
   };
 
@@ -485,24 +634,36 @@ export default function RecordingDetail() {
                               [{segment.time}]
                             </button>
                           )}
-                          <span className="leading-relaxed">
-                            {(() => {
-                              let wordIdx = 0;
-                              return segWords.map((chunk, i) => {
-                                if (/^\s+$/.test(chunk)) return <span key={i}>{chunk}</span>;
-                                const wKey = `${segment.index}-${wordIdx++}`;
-                                return (
-                                  <span
-                                    key={i}
-                                    data-word-key={wKey}
-                                    className={`rounded px-[1px] ${isActiveSegment ? "text-foreground" : "text-foreground/80"}`}
-                                  >
-                                    {chunk}
-                                  </span>
-                                );
-                              });
-                            })()}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="leading-relaxed">
+                              {(() => {
+                                let wordIdx = 0;
+                                return segWords.map((chunk, i) => {
+                                  if (/^\s+$/.test(chunk)) return <span key={i}>{chunk}</span>;
+                                  const wKey = `${segment.index}-${wordIdx++}`;
+                                  return (
+                                    <span
+                                      key={i}
+                                      data-word-key={wKey}
+                                      className={`rounded px-[1px] ${isActiveSegment ? "text-foreground" : "text-foreground/80"}`}
+                                    >
+                                      {chunk}
+                                    </span>
+                                  );
+                                });
+                              })()}
+                            </span>
+                            {language !== 'en' && (
+                              <span className="text-sm text-muted-foreground italic leading-relaxed">
+                                {isTranslating 
+                                  ? <span className="animate-pulse">Translating...</span>
+                                  : translationFailed
+                                  ? <span className="text-destructive">Translation unavailable</span>
+                                  : translatedSegments?.[index]?.text || "Translation missing for this segment"
+                                }
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -520,19 +681,42 @@ export default function RecordingDetail() {
             <TabsContent value="study" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="grid gap-6">
                 <Card className="p-6">
-                  <h3 className="font-heading text-xl font-bold mb-4">Summary</h3>
-                  <div className="prose prose-blue max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: recording.summary || "" }} />
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-heading text-xl font-bold">Summary</h3>
+                    {language !== 'en' && (
+                      <span className="text-xs text-muted-foreground px-2 py-1 bg-muted rounded-full">
+                        {isTranslatingContent ? "Translating..." : `Translated to ${language.toUpperCase()}`}
+                      </span>
+                    )}
+                  </div>
+                  {isTranslatingContent && !translatedSummary ? (
+                    <div className="animate-pulse space-y-2">
+                      <div className="h-4 bg-muted rounded w-full" />
+                      <div className="h-4 bg-muted rounded w-5/6" />
+                      <div className="h-4 bg-muted rounded w-4/6" />
+                    </div>
+                  ) : (
+                    <div 
+                      className="prose prose-blue max-w-none text-muted-foreground"
+                      dangerouslySetInnerHTML={{ __html: translatedSummary || recording.summary || "" }} 
+                    />
+                  )}
                 </Card>
 
                 {keyConcepts.length > 0 && (
                   <Card className="p-6 bg-primary/5 border-primary/10">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="font-heading text-xl font-bold">Interactive Flashcards</h3>
-                      <div className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-wider">
-                        Study Mode
+                      <div className="flex items-center gap-2">
+                        {isTranslatingContent && language !== 'en' && (
+                          <span className="text-xs text-muted-foreground animate-pulse">Translating...</span>
+                        )}
+                        <div className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-wider">
+                          Study Mode
+                        </div>
                       </div>
                     </div>
-                    <FlashcardSet cards={keyConcepts} />
+                    <FlashcardSet key={`flashcards-${language}`} cards={keyConcepts} />
                   </Card>
                 )}
 
@@ -543,6 +727,9 @@ export default function RecordingDetail() {
                         <BrainCircuit className="w-5 h-5 text-amber-700" />
                       </div>
                       <h3 className="font-heading text-xl font-bold text-amber-900">Hidden Insights</h3>
+                      {isTranslatingContent && language !== 'en' && (
+                        <span className="text-xs text-amber-600 animate-pulse ml-auto">Translating...</span>
+                      )}
                     </div>
                     <div className="grid gap-4">
                       {insights.map((insight: any, i: number) => (
@@ -561,7 +748,12 @@ export default function RecordingDetail() {
                 )}
 
                 <Card className="p-6">
-                  <h3 className="font-heading text-xl font-bold mb-4">Key Concepts</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-heading text-xl font-bold">Key Concepts</h3>
+                    {isTranslatingContent && language !== 'en' && (
+                      <span className="text-xs text-muted-foreground animate-pulse">Translating...</span>
+                    )}
+                  </div>
                   {keyConcepts.length > 0 ? (
                     <div className="grid gap-4 sm:grid-cols-2">
                       {keyConcepts.map((concept: any, i: number) => (
@@ -577,7 +769,12 @@ export default function RecordingDetail() {
                 </Card>
                 <Card className="p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-heading text-xl font-bold">Practice Quiz</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-heading text-xl font-bold">Practice Quiz</h3>
+                      {isTranslatingContent && language !== 'en' && (
+                        <span className="text-xs text-muted-foreground animate-pulse">Translating...</span>
+                      )}
+                    </div>
                     {quiz.length === 0 && (
                       <Button onClick={() => quizMutation.mutate()} disabled={quizMutation.isPending}>
                         {quizMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating Quiz...</> : "Create Quiz"}
